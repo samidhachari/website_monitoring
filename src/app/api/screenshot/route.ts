@@ -142,57 +142,6 @@ async function takeScreenshot(url: string, id: number): Promise<string | null> {
 }
 
 
-
-// export async function POST(req: NextRequest) {
-//   try {
-//     const { websites } = await req.json();
-//     if (!websites || !Array.isArray(websites)) {
-//       return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
-//     }
-
-//     const results: ScreenshotResult[] = [];
-
-//     for (const website of websites) {
-//       const statusCheck = await checkWebsiteStatus(website.url);
-//       const sslInfo = await getSSLCertificateInfo(website.url);
-
-//       let screenshot_path: string | undefined = undefined;
-//       if (statusCheck.status !== 'error') {
-//         screenshot_path = (await takeScreenshot(website.url, website.id)) || undefined;
-//       }
-
-//       let finalStatus = statusCheck.status;
-//       if (screenshot_path && statusCheck.status !== 'up') {
-//         finalStatus = 'up';
-//       }
-
-//       let finalSSLValid = sslInfo.ssl_valid;
-//       if (!finalSSLValid && screenshot_path && website.url.startsWith('https://')) {
-//         finalSSLValid = true;
-//       }
-
-//       const result: ScreenshotResult = {
-//         id: website.id,
-//         url: website.url,
-//         screenshot_path, // always points to /screenshots/...
-//         status: finalStatus,
-//         ssl_valid: finalSSLValid,
-//         ssl_expires: sslInfo.ssl_expires,
-//         ssl_days_remaining: sslInfo.ssl_days_remaining,
-//         ssl_issued_date: sslInfo.ssl_issued_date,
-//         response_time: statusCheck.response_time,
-//         error_message: screenshot_path ? undefined : statusCheck.error_message,
-//       };
-
-//       results.push(result);
-//     }
-
-//     return NextResponse.json(results);
-//   } catch (error) {
-//     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-//   }
-// }
-
 export async function POST(req: NextRequest) {
   try {
     // ✅ Explicitly check if request method is POST

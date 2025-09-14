@@ -1,4 +1,7 @@
 
+
+
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -55,7 +58,41 @@ export default function ScreenshotsPage() {
     }
   };
 
-  const runScreenshotCheck = async () => {
+  // const runScreenshotCheck = async () => {
+  //   if (websites.length === 0) {
+  //     setError('No websites to check. Please add some first.');
+  //     return;
+  //   }
+
+  //   setLoading(true);
+  //   setSuccess('');
+  //   setError('');
+
+  //   try {
+  //     const res = await fetch('/api/screenshot', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({ websites }),
+  //     });
+
+  //     if (!res.ok) {
+  //       throw new Error(`API error: ${res.statusText}`);
+  //     }
+
+  //     const results: ScreenshotStatus[] = await res.json();
+  //     setScreenshots(results);
+  //     setSuccess('Screenshot and health check completed successfully!');
+  //   } catch (err: any) {
+  //     console.error('Error running check:', err);
+  //     setError(`Failed to run check: ${err.message}`);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+    const runScreenshotCheck = async () => {
     if (websites.length === 0) {
       setError('No websites to check. Please add some first.');
       return;
@@ -64,23 +101,50 @@ export default function ScreenshotsPage() {
     setLoading(true);
     setSuccess('');
     setError('');
+    setScreenshots(
+      websites.map((site) => ({
+        ...site,
+        status: 'checking',
+        ssl_valid: false,
+      }))
+    );
 
     try {
-      const res = await fetch('/api/screenshot', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ websites }),
-      });
+      const results: ScreenshotStatus[] = [];
 
-      if (!res.ok) {
-        throw new Error(`API error: ${res.statusText}`);
+      // ✅ Process one website at a time to avoid Vercel timeouts
+      for (const site of websites) {
+        try {
+          const res = await fetch('/api/screenshot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ websites: [site] }), // send single site
+          });
+
+          if (!res.ok) {
+            throw new Error(`API error: ${res.statusText}`);
+          }
+
+          const [result] = await res.json(); // backend returns an array
+          results.push(result);
+
+          // Update UI incrementally
+          setScreenshots((prev) =>
+            prev.map((item) => (item.id === site.id ? result : item))
+          );
+        } catch (err: any) {
+          console.error(`Error checking ${site.url}:`, err);
+          results.push({
+            id: site.id,
+            url: site.url,
+            status: 'error',
+            ssl_valid: false,
+            error_message: err.message,
+          });
+        }
       }
 
-      const results: ScreenshotStatus[] = await res.json();
-      setScreenshots(results);
-      setSuccess('Screenshot and health check completed successfully!');
+      setSuccess('All website checks completed!');
     } catch (err: any) {
       console.error('Error running check:', err);
       setError(`Failed to run check: ${err.message}`);
@@ -88,6 +152,7 @@ export default function ScreenshotsPage() {
       setLoading(false);
     }
   };
+
 
   const getStatusIcon = (status: 'up' | 'down' | 'error' | 'checking') => {
     switch (status) {
