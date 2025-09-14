@@ -141,11 +141,76 @@ async function takeScreenshot(url: string, id: number): Promise<string | null> {
   }
 }
 
+
+
+// export async function POST(req: NextRequest) {
+//   try {
+//     const { websites } = await req.json();
+//     if (!websites || !Array.isArray(websites)) {
+//       return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
+//     }
+
+//     const results: ScreenshotResult[] = [];
+
+//     for (const website of websites) {
+//       const statusCheck = await checkWebsiteStatus(website.url);
+//       const sslInfo = await getSSLCertificateInfo(website.url);
+
+//       let screenshot_path: string | undefined = undefined;
+//       if (statusCheck.status !== 'error') {
+//         screenshot_path = (await takeScreenshot(website.url, website.id)) || undefined;
+//       }
+
+//       let finalStatus = statusCheck.status;
+//       if (screenshot_path && statusCheck.status !== 'up') {
+//         finalStatus = 'up';
+//       }
+
+//       let finalSSLValid = sslInfo.ssl_valid;
+//       if (!finalSSLValid && screenshot_path && website.url.startsWith('https://')) {
+//         finalSSLValid = true;
+//       }
+
+//       const result: ScreenshotResult = {
+//         id: website.id,
+//         url: website.url,
+//         screenshot_path, // always points to /screenshots/...
+//         status: finalStatus,
+//         ssl_valid: finalSSLValid,
+//         ssl_expires: sslInfo.ssl_expires,
+//         ssl_days_remaining: sslInfo.ssl_days_remaining,
+//         ssl_issued_date: sslInfo.ssl_issued_date,
+//         response_time: statusCheck.response_time,
+//         error_message: screenshot_path ? undefined : statusCheck.error_message,
+//       };
+
+//       results.push(result);
+//     }
+
+//     return NextResponse.json(results);
+//   } catch (error) {
+//     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+//   }
+// }
+
 export async function POST(req: NextRequest) {
   try {
-    const { websites } = await req.json();
+    // ✅ Explicitly check if request method is POST
+    if (req.method !== "POST") {
+      return NextResponse.json(
+        { error: "Method Not Allowed. Use POST." },
+        { status: 405 }
+      );
+    }
+
+    const body = await req.json();
+    const { websites } = body;
+
     if (!websites || !Array.isArray(websites)) {
-      return NextResponse.json({ error: 'Invalid input' }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid input. Expected { websites: [...] }" },
+        { status: 400 }
+      );
     }
 
     const results: ScreenshotResult[] = [];
@@ -155,24 +220,25 @@ export async function POST(req: NextRequest) {
       const sslInfo = await getSSLCertificateInfo(website.url);
 
       let screenshot_path: string | undefined = undefined;
-      if (statusCheck.status !== 'error') {
-        screenshot_path = (await takeScreenshot(website.url, website.id)) || undefined;
+      if (statusCheck.status !== "error") {
+        screenshot_path =
+          (await takeScreenshot(website.url, website.id)) || undefined;
       }
 
       let finalStatus = statusCheck.status;
-      if (screenshot_path && statusCheck.status !== 'up') {
-        finalStatus = 'up';
+      if (screenshot_path && statusCheck.status !== "up") {
+        finalStatus = "up";
       }
 
       let finalSSLValid = sslInfo.ssl_valid;
-      if (!finalSSLValid && screenshot_path && website.url.startsWith('https://')) {
+      if (!finalSSLValid && screenshot_path && website.url.startsWith("https://")) {
         finalSSLValid = true;
       }
 
       const result: ScreenshotResult = {
         id: website.id,
         url: website.url,
-        screenshot_path, // always points to /screenshots/...
+        screenshot_path, // always points to /screenshots/... or downloads
         status: finalStatus,
         ssl_valid: finalSSLValid,
         ssl_expires: sslInfo.ssl_expires,
@@ -185,8 +251,13 @@ export async function POST(req: NextRequest) {
       results.push(result);
     }
 
-    return NextResponse.json(results);
-  } catch (error) {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(results, { status: 200 });
+  } catch (error: any) {
+    console.error("❌ API Error in /api/screenshot:", error);
+    return NextResponse.json(
+      { error: "Internal Server Error", details: error.message },
+      { status: 500 }
+    );
   }
 }
+
