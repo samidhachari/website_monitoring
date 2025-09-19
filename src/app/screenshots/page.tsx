@@ -81,7 +81,9 @@ export default function ScreenshotsPage() {
       // ✅ Process one website at a time to avoid Vercel timeouts
         for (const site of websites) {
           try {
-          const res = await fetch('/api/screenshot', {
+          const apiBase = (process.env.NEXT_PUBLIC_API_URL as string) || '';
+          const endpoint = apiBase ? `${apiBase}/api/screenshot` : '/api/screenshot';
+          const res = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ websites: [site] }), // send single site
