@@ -49,49 +49,47 @@ Prerequisites
 Installation
 
 1. Clone the repository:
-```bash
+bash
 git clone https://github.com/samidhachari/website_monitoring.git
 cd Website_Monitoring
-```
+
 
 2. Install dependencies:
-```bash
+bash
 npm install
-```
+
 
 3. Set up environment variables:
 Create `.env.local` file and add your Supabase credentials:
-```bash
+bash
+
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
+
 
 4. Set up Supabase database:
 Run the SQL commands from `supabase-setup.sql` in your Supabase SQL editor:
-```sql
+sql
 CREATE TABLE websites (
   id BIGSERIAL PRIMARY KEY,
   url TEXT NOT NULL UNIQUE,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-```
+
 
 5. Install Playwright browsers:
-```bash
-npx playwright install chromium
-```
+bash -> npx playwright install chromium
+
 
 6. Start the development server:
-```bash
-npm run dev
-```
+bash -> npm run dev
+
 
 7. Open your browser:
 Navigate to `http://localhost:3001`
 
 Project Structure
 
-```
 src/
 ├── app/
 │   ├── layout.tsx           # Root layout with error boundary
@@ -113,7 +111,7 @@ src/
 │   └── ErrorBoundary.tsx    # Error boundary component
 └── public/
     └── screenshots/         # Generated screenshot storage
-```
+
 
 Tech Stack
 
@@ -137,7 +135,7 @@ Automation & Monitoring
 
 Database Schema
 
-```sql
+sql
 -- Main websites table
 CREATE TABLE websites (
   id BIGSERIAL PRIMARY KEY,
@@ -151,7 +149,7 @@ ALTER TABLE websites ENABLE ROW LEVEL SECURITY;
 -- Optional: Indexes for better performance
 CREATE INDEX idx_websites_created_at ON websites(created_at DESC);
 CREATE UNIQUE INDEX idx_websites_url ON websites(url);
-```
+
 
 Usage Guide
 
@@ -182,14 +180,14 @@ SSL Certificate Monitoring
 Configuration & Customization
 
 Environment Variables
-```bash
+bash
 # Required
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
 # Optional (for future features)
 NEXT_PUBLIC_SUPABASE_SERVICE_KEY=your-service-key
-```
+
 
 Supabase Setup Steps
 1. Create a new Supabase project at [supabase.com](https://supabase.com)
@@ -229,7 +227,7 @@ Supabase connection errors:
 - Check if API route is properly exported
 
 Development Commands
-```bash
+bash
 # Check for errors
 npm run lint
 
@@ -241,7 +239,7 @@ npm run start
 
 # Install missing dependencies
 npm install
-```
+
 
 Performance & Optimization
 

@@ -135,3 +135,6 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY='<YOUR_SUPABASE_ANON_KEY>'
     </div>
   );
 }
+
+
+

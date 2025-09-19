@@ -58,40 +58,6 @@ export default function ScreenshotsPage() {
     }
   };
 
-  // const runScreenshotCheck = async () => {
-  //   if (websites.length === 0) {
-  //     setError('No websites to check. Please add some first.');
-  //     return;
-  //   }
-
-  //   setLoading(true);
-  //   setSuccess('');
-  //   setError('');
-
-  //   try {
-  //     const res = await fetch('/api/screenshot', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({ websites }),
-  //     });
-
-  //     if (!res.ok) {
-  //       throw new Error(`API error: ${res.statusText}`);
-  //     }
-
-  //     const results: ScreenshotStatus[] = await res.json();
-  //     setScreenshots(results);
-  //     setSuccess('Screenshot and health check completed successfully!');
-  //   } catch (err: any) {
-  //     console.error('Error running check:', err);
-  //     setError(`Failed to run check: ${err.message}`);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
     const runScreenshotCheck = async () => {
     if (websites.length === 0) {
       setError('No websites to check. Please add some first.');
@@ -113,8 +79,8 @@ export default function ScreenshotsPage() {
       const results: ScreenshotStatus[] = [];
 
       // ✅ Process one website at a time to avoid Vercel timeouts
-      for (const site of websites) {
-        try {
+        for (const site of websites) {
+          try {
           const res = await fetch('/api/screenshot', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -132,22 +98,24 @@ export default function ScreenshotsPage() {
           setScreenshots((prev) =>
             prev.map((item) => (item.id === site.id ? result : item))
           );
-        } catch (err: any) {
-          console.error(`Error checking ${site.url}:`, err);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(`Error checking ${site.url}:`, message);
           results.push({
             id: site.id,
             url: site.url,
             status: 'error',
             ssl_valid: false,
-            error_message: err.message,
+            error_message: message,
           });
         }
       }
 
       setSuccess('All website checks completed!');
-    } catch (err: any) {
-      console.error('Error running check:', err);
-      setError(`Failed to run check: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('Error running check:', message);
+      setError(`Failed to run check: ${message}`);
     } finally {
       setLoading(false);
     }
@@ -247,8 +215,7 @@ export default function ScreenshotsPage() {
               {screenshots.map((item, index) => (
                 <div
                   key={item.id}
-                  className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex flex-col hover:shadow-lg transition-all"
-                  style={{ width: "260px" }} // ✅ Smaller card width
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden flex flex-col hover:shadow-lg transition-all w-[260px]"
                 >
                   {/* Image or Placeholder */}
                   <div className="relative w-full h-40 bg-gray-200 dark:bg-gray-900 flex items-center justify-center overflow-hidden">
@@ -307,12 +274,53 @@ export default function ScreenshotsPage() {
               ))}
             </div>
 
+            {/* Modal for selected screenshot */}
+            {selectedScreenshot && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+                <div className="bg-white dark:bg-gray-900 rounded-lg shadow-xl max-w-3xl w-full mx-4 overflow-hidden">
+                  <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-800">
+                    <p className="text-sm font-medium">{selectedScreenshot.url}</p>
+                    <div className="flex items-center space-x-2">
+                      <a
+                        href={selectedScreenshot.screenshot_path}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-gray-600 hover:text-gray-900 dark:text-gray-300 flex items-center"
+                      >
+                        <ExternalLink className="w-5 h-5" />
+                        <span className="sr-only">Open screenshot in new tab</span>
+                      </a>
+                      <button
+                        onClick={() => setSelectedScreenshot(null)}
+                        className="text-gray-600 hover:text-gray-900 dark:text-gray-300"
+                        aria-label="Close"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="p-4 bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                    {selectedScreenshot.screenshot_path ? (
+                      <Image
+                        src={selectedScreenshot.screenshot_path}
+                        alt={`Screenshot of ${selectedScreenshot.url}`}
+                        width={1024}
+                        height={600}
+                        className="max-w-full h-auto rounded"
+                      />
+                    ) : (
+                      <p className="text-sm text-gray-600 dark:text-gray-300 p-6">No screenshot available</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
 
         </div>
       </div>
     </div>
   );
 }
-
 
 

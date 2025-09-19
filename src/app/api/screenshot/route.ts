@@ -96,26 +96,34 @@ async function checkWebsiteStatus(url: string): Promise<{
       return { status: 'up', response_time: end - start };
     }
     return { status: 'down', error_message: `HTTP Status: ${response.status}` };
-  } catch (err: any) {
-    return { status: 'error', error_message: err.message };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { status: 'error', error_message: message };
   }
 }
 
 async function takeScreenshot(url: string, id: number): Promise<string | null> {
   let browser;
   try {
+    console.debug('[screenshot] launching browser');
     browser = await chromium.launch({
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
       headless: true,
     });
+
+    console.debug('[screenshot] browser launched');
 
     const context = await browser.newContext({ ignoreHTTPSErrors: true });
     const page = await context.newPage();
     await page.setViewportSize({ width: 1280, height: 720 });
 
     try {
+      console.debug('[screenshot] navigating to', url);
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
-    } catch {
+      console.debug('[screenshot] navigation finished');
+    } catch (navErr: unknown) {
+      const navMsg = navErr instanceof Error ? navErr.message : String(navErr);
+      console.debug('[screenshot] navigation failed:', navMsg);
       return null;
     }
 
@@ -127,8 +135,22 @@ async function takeScreenshot(url: string, id: number): Promise<string | null> {
     const publicFile = path.join(publicDir, filename);
 
     await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
-    await page.screenshot({ path: downloadsFile, quality: 75, type: 'jpeg' });
-    await page.screenshot({ path: publicFile, quality: 75, type: 'jpeg' });
+    try {
+      console.debug('[screenshot] saving to', downloadsFile);
+      await page.screenshot({ path: downloadsFile, quality: 75, type: 'jpeg' });
+      console.debug('[screenshot] saved to downloads');
+    } catch (saveErr: unknown) {
+      const saveMsg = saveErr instanceof Error ? saveErr.message : String(saveErr);
+      console.debug('[screenshot] failed to save to downloads:', saveMsg);
+    }
+    try {
+      console.debug('[screenshot] saving to', publicFile);
+      await page.screenshot({ path: publicFile, quality: 75, type: 'jpeg' });
+      console.debug('[screenshot] saved to public');
+    } catch (saveErr: unknown) {
+      const saveMsg = saveErr instanceof Error ? saveErr.message : String(saveErr);
+      console.debug('[screenshot] failed to save to public:', saveMsg);
+    }
 
     // Return public URL (so frontend can access it)
     return `/screenshots/${filename}`;
@@ -153,7 +175,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { websites } = body;
+    const { websites } = body as { websites?: Website[] };
 
     if (!websites || !Array.isArray(websites)) {
       return NextResponse.json(
@@ -201,10 +223,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(results, { status: 200 });
-  } catch (error: any) {
-    console.error("❌ API Error in /api/screenshot:", error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("❌ API Error in /api/screenshot:", message);
     return NextResponse.json(
-      { error: "Internal Server Error", details: error.message },
+      { error: "Internal Server Error", details: message },
       { status: 500 }
     );
   }
