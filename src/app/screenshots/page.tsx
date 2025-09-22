@@ -80,18 +80,22 @@ export default function ScreenshotsPage() {
 
       // ✅ Process one website at a time to avoid Vercel timeouts
         for (const site of websites) {
-          try {
-          const res = await fetch('/api/screenshot', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ websites: [site] }), // send single site
-          });
+              try {
+                const res = await fetch('/api/screenshot', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ websites: [site] }), // send single site
+                });
 
-          if (!res.ok) {
-            throw new Error(`API error: ${res.statusText}`);
-          }
+                if (!res.ok) {
+                  let text = '';
+                  try {
+                    text = await res.text();
+                  } catch {}
+                  throw new Error(`API error ${res.status}: ${text || res.statusText}`);
+                }
 
-          const [result] = await res.json(); // backend returns an array
+                const [result] = await res.json(); // backend returns an array
           results.push(result);
 
           // Update UI incrementally

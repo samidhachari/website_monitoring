@@ -21,6 +21,12 @@ type ScreenshotResult = {
   error_message?: string;
 };
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+};
+
 // 📂 Create Downloads/temp folder
 const downloadsDir = path.join(os.homedir(), 'Downloads', 'website_screenshots');
 if (!fs.existsSync(downloadsDir)) {
@@ -170,7 +176,7 @@ export async function POST(req: NextRequest) {
     if (req.method !== "POST") {
       return NextResponse.json(
         { error: "Method Not Allowed. Use POST." },
-        { status: 405 }
+        { status: 405, headers: CORS_HEADERS }
       );
     }
 
@@ -222,14 +228,18 @@ export async function POST(req: NextRequest) {
       results.push(result);
     }
 
-    return NextResponse.json(results, { status: 200 });
+    return NextResponse.json(results, { status: 200, headers: CORS_HEADERS });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("❌ API Error in /api/screenshot:", message);
     return NextResponse.json(
       { error: "Internal Server Error", details: message },
-      { status: 500 }
+      { status: 500, headers: CORS_HEADERS }
     );
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
