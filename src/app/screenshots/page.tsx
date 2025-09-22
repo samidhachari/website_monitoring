@@ -80,8 +80,10 @@ export default function ScreenshotsPage() {
 
       // ✅ Process one website at a time to avoid Vercel timeouts
         for (const site of websites) {
-              try {
-                const res = await fetch('/api/screenshot', {
+           try {
+           const apiBase = process.env.NEXT_PUBLIC_API_URL as string | undefined;
+           const endpoint = apiBase ? `${apiBase.replace(/\/$/, '')}/api/screenshot` : '/api/screenshot';
+             const res = await fetch(endpoint, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ websites: [site] }), // send single site
@@ -96,22 +98,25 @@ export default function ScreenshotsPage() {
                 }
 
                 const [result] = await res.json(); // backend returns an array
-          results.push(result);
+                results.push(result);
 
-          // Update UI incrementally
-          setScreenshots((prev) =>
-            prev.map((item) => (item.id === site.id ? result : item))
-          );
+                // Update UI incrementally for this site
+                setScreenshots((prev) =>
+                  prev.map((item) => (item.id === site.id ? result : item))
+                );
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : String(err);
           console.error(`Error checking ${site.url}:`, message);
-          results.push({
-            id: site.id,
-            url: site.url,
-            status: 'error',
-            ssl_valid: false,
-            error_message: message,
-          });
+                const errorResult = {
+                  id: site.id,
+                  url: site.url,
+                  status: 'error',
+                  ssl_valid: false,
+                  error_message: message,
+                } as ScreenshotStatus;
+                results.push(errorResult);
+                // update UI for this site so the card doesn't stay on 'checking'
+                setScreenshots((prev) => prev.map((item) => (item.id === site.id ? errorResult : item)));
         }
       }
 
