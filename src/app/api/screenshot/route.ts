@@ -216,41 +216,82 @@ export async function POST(req: NextRequest) {
 
     const results: ScreenshotResult[] = [];
 
+    // Progress tracker for logging
+    const progress: Record<number, { url: string; status: string }> = {};
+    websites.forEach((w) => (progress[w.id] = { url: w.url, status: 'queued' }));
+
+    const startTime = Date.now();
+    const logHeartbeat = () => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const total = websites.length;
+      const done = Object.values(progress).filter((p) => p.status !== 'queued' && p.status !== 'processing').length;
+      const processing = Object.values(progress).filter((p) => p.status === 'processing').map((p) => p.url);
+      console.log(`[screenshot-progress] elapsed=${elapsed}s total=${total} done=${done} processing=${processing.length}`);
+      if (processing.length) console.log(`[screenshot-progress] processing: ${processing.join(', ')}`);
+    };
+
+    const heartbeat = setInterval(logHeartbeat, 5000);
+
     for (const website of websites) {
-      const statusCheck = await checkWebsiteStatus(website.url);
-      const sslInfo = await getSSLCertificateInfo(website.url);
+      try {
+        console.log(`[screenshot] starting check for ${website.url}`);
+        progress[website.id].status = 'processing';
 
-      let screenshot_path: string | undefined = undefined;
-      if (statusCheck.status !== "error") {
-        screenshot_path =
-          (await takeScreenshot(website.url, website.id)) || undefined;
+        const statusCheck = await checkWebsiteStatus(website.url);
+        console.log(`[screenshot] status for ${website.url}: ${statusCheck.status}`);
+
+        const sslInfo = await getSSLCertificateInfo(website.url);
+        console.log(`[screenshot] ssl for ${website.url}: valid=${sslInfo.ssl_valid} expires=${sslInfo.ssl_expires}`);
+
+        let screenshot_path: string | undefined = undefined;
+        if (statusCheck.status !== 'error') {
+          console.log(`[screenshot] taking screenshot for ${website.url}`);
+          screenshot_path = (await takeScreenshot(website.url, website.id)) || undefined;
+          console.log(`[screenshot] screenshot result for ${website.url}: ${screenshot_path ?? 'none'}`);
+        }
+
+        let finalStatus = statusCheck.status;
+        if (screenshot_path && statusCheck.status !== 'up') {
+          finalStatus = 'up';
+        }
+
+        let finalSSLValid = sslInfo.ssl_valid;
+        if (!finalSSLValid && screenshot_path && website.url.startsWith('https://')) {
+          finalSSLValid = true;
+        }
+
+        const result: ScreenshotResult = {
+          id: website.id,
+          url: website.url,
+          screenshot_path,
+          status: finalStatus,
+          ssl_valid: finalSSLValid,
+          ssl_expires: sslInfo.ssl_expires,
+          ssl_days_remaining: sslInfo.ssl_days_remaining,
+          ssl_issued_date: sslInfo.ssl_issued_date,
+          response_time: statusCheck.response_time,
+          error_message: screenshot_path ? undefined : statusCheck.error_message,
+        };
+
+        results.push(result);
+        progress[website.id].status = 'done';
+        console.log(`[screenshot] finished ${website.url} -> status=${finalStatus}`);
+      } catch (siteErr: unknown) {
+        const sMsg = siteErr instanceof Error ? siteErr.message : String(siteErr);
+        console.error(`[screenshot] error processing ${website.url}: ${sMsg}`);
+        const errorResult: ScreenshotResult = {
+          id: website.id,
+          url: website.url,
+          status: 'error',
+          ssl_valid: false,
+        };
+        results.push(errorResult);
+        progress[website.id].status = 'error';
       }
-
-      let finalStatus = statusCheck.status;
-      if (screenshot_path && statusCheck.status !== "up") {
-        finalStatus = "up";
-      }
-
-      let finalSSLValid = sslInfo.ssl_valid;
-      if (!finalSSLValid && screenshot_path && website.url.startsWith("https://")) {
-        finalSSLValid = true;
-      }
-
-      const result: ScreenshotResult = {
-        id: website.id,
-        url: website.url,
-        screenshot_path, // always points to /screenshots/... or downloads
-        status: finalStatus,
-        ssl_valid: finalSSLValid,
-        ssl_expires: sslInfo.ssl_expires,
-        ssl_days_remaining: sslInfo.ssl_days_remaining,
-        ssl_issued_date: sslInfo.ssl_issued_date,
-        response_time: statusCheck.response_time,
-        error_message: screenshot_path ? undefined : statusCheck.error_message,
-      };
-
-      results.push(result);
     }
+
+    clearInterval(heartbeat);
+    logHeartbeat();
 
     return NextResponse.json(results, { status: 200, headers: CORS_HEADERS });
   } catch (error: unknown) {
