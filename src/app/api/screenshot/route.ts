@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { chromium } from 'playwright';
 import { Website } from '@/lib/supabase';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import path from 'path';
 import fs from 'fs';
 import tls from 'tls';
@@ -135,30 +136,53 @@ async function takeScreenshot(url: string, id: number): Promise<string | null> {
 
     const filename = `screenshot_${id}_${Date.now()}.jpeg`;
 
-    // Save to Downloads
-    const downloadsFile = path.join(downloadsDir, filename);
-    // Save to public/screenshots
-    const publicFile = path.join(publicDir, filename);
-
     await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
-    try {
-      console.debug('[screenshot] saving to', downloadsFile);
-      await page.screenshot({ path: downloadsFile, quality: 75, type: 'jpeg' });
-      console.debug('[screenshot] saved to downloads');
-    } catch (saveErr: unknown) {
-      const saveMsg = saveErr instanceof Error ? saveErr.message : String(saveErr);
-      console.debug('[screenshot] failed to save to downloads:', saveMsg);
-    }
-    try {
-      console.debug('[screenshot] saving to', publicFile);
-      await page.screenshot({ path: publicFile, quality: 75, type: 'jpeg' });
-      console.debug('[screenshot] saved to public');
-    } catch (saveErr: unknown) {
-      const saveMsg = saveErr instanceof Error ? saveErr.message : String(saveErr);
-      console.debug('[screenshot] failed to save to public:', saveMsg);
+
+    // Capture as buffer so we can upload to Supabase Storage or write to disk as fallback
+    const buffer = await page.screenshot({ type: 'jpeg', quality: 75 }) as Buffer;
+
+    // If Supabase service role key and bucket are configured, upload to storage
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const storageBucket = process.env.SUPABASE_STORAGE_BUCKET;
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+    if (serviceKey && storageBucket && supabaseUrl) {
+      try {
+        const supa = createSupabaseClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+        const pathInBucket = `screenshots/${filename}`;
+        console.debug('[screenshot] uploading to Supabase storage', pathInBucket);
+        const { error: uploadError } = await supa.storage.from(storageBucket).upload(pathInBucket, buffer, { contentType: 'image/jpeg', upsert: false });
+        if (uploadError) {
+          console.debug('[screenshot] supabase upload error', uploadError.message);
+        } else {
+          // Construct public URL for public buckets
+          const publicUrl = `${supabaseUrl.replace('/api/v1', '')}/storage/v1/object/public/${storageBucket}/${pathInBucket}`;
+          return publicUrl;
+        }
+      } catch (supErr: unknown) {
+        const msg = supErr instanceof Error ? supErr.message : String(supErr);
+        console.debug('[screenshot] supabase upload failed:', msg);
+      }
     }
 
-    // Return public URL (so frontend can access it)
+    // Fallback: write to local Downloads and public folders
+    try {
+      const downloadsFile = path.join(downloadsDir, filename);
+      await fs.promises.writeFile(downloadsFile, buffer);
+      console.debug('[screenshot] saved to downloads (fallback)');
+    } catch (writeErr: unknown) {
+      const writeMsg = writeErr instanceof Error ? writeErr.message : String(writeErr);
+      console.debug('[screenshot] failed to write to downloads:', writeMsg);
+    }
+    try {
+      const publicFile = path.join(publicDir, filename);
+      await fs.promises.writeFile(publicFile, buffer);
+      console.debug('[screenshot] saved to public (fallback)');
+    } catch (writeErr: unknown) {
+      const writeMsg = writeErr instanceof Error ? writeErr.message : String(writeErr);
+      console.debug('[screenshot] failed to write to public:', writeMsg);
+    }
+
     return `/screenshots/${filename}`;
   } catch {
     return null;
