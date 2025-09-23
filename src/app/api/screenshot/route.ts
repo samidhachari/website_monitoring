@@ -114,19 +114,35 @@ async function takeScreenshot(url: string, id: number): Promise<string | null> {
   try {
     console.debug('[screenshot] launching browser');
     browser = await chromium.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor'
+      ],
       headless: true,
+      timeout: 10000, // 10 second timeout for browser launch
     });
 
     console.debug('[screenshot] browser launched');
 
-    const context = await browser.newContext({ ignoreHTTPSErrors: true });
+    const context = await browser.newContext({ 
+      ignoreHTTPSErrors: true,
+      // Reduce viewport size for faster rendering
+      viewport: { width: 1024, height: 768 }
+    });
     const page = await context.newPage();
-    await page.setViewportSize({ width: 1280, height: 720 });
+    
+    // Set shorter timeouts for faster processing
+    page.setDefaultTimeout(15000); // 15 seconds max
+    page.setDefaultNavigationTimeout(15000);
 
     try {
       console.debug('[screenshot] navigating to', url);
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      // Use 'load' instead of 'domcontentloaded' for faster completion
+      await page.goto(url, { waitUntil: 'load', timeout: 15000 });
       console.debug('[screenshot] navigation finished');
     } catch (navErr: unknown) {
       const navMsg = navErr instanceof Error ? navErr.message : String(navErr);
@@ -136,10 +152,17 @@ async function takeScreenshot(url: string, id: number): Promise<string | null> {
 
     const filename = `screenshot_${id}_${Date.now()}.jpeg`;
 
-    await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+    // Reduce wait time significantly - only wait 2 seconds instead of 8
+    await page.waitForLoadState('networkidle', { timeout: 2000 }).catch(() => {
+      console.debug('[screenshot] networkidle timeout, proceeding anyway');
+    });
 
-    // Capture as buffer so we can upload to Supabase Storage or write to disk as fallback
-    const buffer = await page.screenshot({ type: 'jpeg', quality: 75 }) as Buffer;
+    // Capture as buffer with lower quality for faster processing
+    const buffer = await page.screenshot({ 
+      type: 'jpeg', 
+      quality: 60, // Reduced quality for faster processing
+      fullPage: false // Only capture viewport, not full page
+    }) as Buffer;
 
     // If Supabase service role key and bucket are configured, upload to storage
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -232,7 +255,8 @@ export async function POST(req: NextRequest) {
 
     const heartbeat = setInterval(logHeartbeat, 5000);
 
-    for (const website of websites) {
+    // Process websites in parallel for faster execution (max 3 concurrent)
+    const processWebsite = async (website: Website): Promise<ScreenshotResult> => {
       try {
         console.log(`[screenshot] starting check for ${website.url}`);
         progress[website.id].status = 'processing';
@@ -273,21 +297,28 @@ export async function POST(req: NextRequest) {
           error_message: screenshot_path ? undefined : statusCheck.error_message,
         };
 
-        results.push(result);
         progress[website.id].status = 'done';
         console.log(`[screenshot] finished ${website.url} -> status=${finalStatus}`);
+        return result;
       } catch (siteErr: unknown) {
         const sMsg = siteErr instanceof Error ? siteErr.message : String(siteErr);
         console.error(`[screenshot] error processing ${website.url}: ${sMsg}`);
-        const errorResult: ScreenshotResult = {
+        progress[website.id].status = 'error';
+        return {
           id: website.id,
           url: website.url,
           status: 'error',
           ssl_valid: false,
         };
-        results.push(errorResult);
-        progress[website.id].status = 'error';
       }
+    };
+
+    // Process websites in batches of 3 to avoid overwhelming the system
+    const batchSize = 3;
+    for (let i = 0; i < websites.length; i += batchSize) {
+      const batch = websites.slice(i, i + batchSize);
+      const batchResults = await Promise.all(batch.map(processWebsite));
+      results.push(...batchResults);
     }
 
     clearInterval(heartbeat);
