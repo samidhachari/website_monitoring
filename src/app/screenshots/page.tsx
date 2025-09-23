@@ -97,7 +97,7 @@ export default function ScreenshotsPage() {
         for (const site of websites) {
            try {
            const apiBase = process.env.NEXT_PUBLIC_API_URL as string | undefined;
-           const endpoint = apiBase ? `${apiBase.replace(/\/$/, '')}/api/screenshot` : '/api/screenshot';
+           const endpoint = apiBase ? `${apiBase.replace(/\/$/, '')}/api/screenshot-fast` : '/api/screenshot-fast';
              const res = await fetch(endpoint, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -259,8 +259,8 @@ export default function ScreenshotsPage() {
                       </div>
                     ) : (
                       <div className="text-gray-500 dark:text-gray-400 text-center p-4 text-xs">
-                        <p>No screenshot available</p>
-                        <p className="text-[10px] mt-1">{item.error_message}</p>
+                        <p>Status check only</p>
+                        <p className="text-[10px] mt-1">Screenshots disabled for Vercel</p>
                       </div>
                     )}
                   </div>
