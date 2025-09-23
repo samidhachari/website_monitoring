@@ -30,6 +30,7 @@ export default function ScreenshotsPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedScreenshot, setSelectedScreenshot] = useState<ScreenshotStatus | null>(null);
+  const [screenshotMode, setScreenshotMode] = useState<'fast' | 'screenshots'>('fast');
 
   useEffect(() => {
     fetchWebsites();
@@ -97,7 +98,9 @@ export default function ScreenshotsPage() {
         for (const site of websites) {
            try {
            const apiBase = process.env.NEXT_PUBLIC_API_URL as string | undefined;
-           const endpoint = apiBase ? `${apiBase.replace(/\/$/, '')}/api/screenshot-fast` : '/api/screenshot-fast';
+           const endpoint = apiBase 
+             ? `${apiBase.replace(/\/$/, '')}/api/${screenshotMode === 'fast' ? 'screenshot-fast' : 'screenshot'}`
+             : `/api/${screenshotMode === 'fast' ? 'screenshot-fast' : 'screenshot'}`;
              const res = await fetch(endpoint, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -206,6 +209,43 @@ export default function ScreenshotsPage() {
             </p>
           </div>
 
+          {/* Mode Toggle */}
+          <div className="flex justify-center mb-8">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-md">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Mode:</span>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setScreenshotMode('fast')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      screenshotMode === 'fast'
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    ⚡ Fast Mode
+                  </button>
+                  <button
+                    onClick={() => setScreenshotMode('screenshots')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      screenshotMode === 'screenshots'
+                        ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400'
+                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    📸 Screenshots
+                  </button>
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">
+                {screenshotMode === 'fast' 
+                  ? 'Status checks only - works on all Vercel plans' 
+                  : 'Full screenshots - requires Vercel Pro/Enterprise'
+                }
+              </div>
+            </div>
+          </div>
+
           {/* Action Button */}
           <div className="flex justify-center mb-12">
             <button
@@ -213,12 +253,14 @@ export default function ScreenshotsPage() {
               className={`flex items-center px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
                 loading
                   ? 'bg-gray-400 text-white cursor-not-allowed'
+                  : screenshotMode === 'fast'
+                  ? 'bg-green-600 text-white hover:bg-green-700 hover:scale-105'
                   : 'bg-purple-600 text-white hover:bg-purple-700 hover:scale-105'
               }`}
               disabled={loading}
             >
               <Camera className={`w-5 h-5 mr-2 ${loading ? 'animate-pulse' : ''}`} />
-              {loading ? 'Checking...' : 'Run All Checks'}
+              {loading ? 'Checking...' : `Run All Checks (${screenshotMode === 'fast' ? 'Fast' : 'Screenshots'})`}
             </button>
           </div>
 
@@ -259,8 +301,17 @@ export default function ScreenshotsPage() {
                       </div>
                     ) : (
                       <div className="text-gray-500 dark:text-gray-400 text-center p-4 text-xs">
-                        <p>Status check only</p>
-                        <p className="text-[10px] mt-1">Screenshots disabled for Vercel</p>
+                        {screenshotMode === 'fast' ? (
+                          <>
+                            <p>Status check only</p>
+                            <p className="text-[10px] mt-1">Screenshots disabled in Fast Mode</p>
+                          </>
+                        ) : (
+                          <>
+                            <p>No screenshot available</p>
+                            <p className="text-[10px] mt-1">{item.error_message}</p>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
