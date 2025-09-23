@@ -54,7 +54,22 @@ export default function ScreenshotsPage() {
       );
     } catch (err) {
       console.error('Error fetching websites:', err);
-      setError('Failed to load websites. Please check your Supabase connection and tables.');
+      // Show demo data when Supabase is not configured
+      const demoWebsites = [
+        { id: 1, url: 'https://google.com', created_at: new Date().toISOString() },
+        { id: 2, url: 'https://github.com', created_at: new Date().toISOString() },
+        { id: 3, url: 'https://stackoverflow.com', created_at: new Date().toISOString() },
+        { id: 4, url: 'https://vercel.com', created_at: new Date().toISOString() }
+      ];
+      setWebsites(demoWebsites);
+      setScreenshots(
+        demoWebsites.map((site) => ({
+          ...site,
+          status: 'checking',
+          ssl_valid: false,
+        }))
+      );
+      setError('Demo mode: Using sample websites. Configure Supabase to add your own URLs.');
     }
   };
 
